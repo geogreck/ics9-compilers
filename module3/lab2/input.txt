@@ -1,0 +1,28 @@
+define int array SumVectors ( int array array A, int array B)
+    while T do
+        a := a + 111; a := a + 111; a := a + 111;
+        if T then
+            a := a + 1;
+            char array a := "abc" $QUOT$QUOT "abc $NUL";
+            char b := '#{D}';
+        end;
+    end;
+    int x:=B[3];
+    f(x);
+assert x;
+do
+x(x);
+until x;
+end; define int array SumVectors ( int array array A, int array B)
+    while T do
+        a := a + 111;
+        if T then
+            a := a + 1;
+            char array a := "abc" $QUOT$QUOT "abc $NUL";
+            char b := '#{D}';
+        end;
+    end;
+end;
+
+
+
