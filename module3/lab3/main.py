@@ -197,8 +197,29 @@ class DeclOperator(Operator):
         return DeclOperator(type, name, expr, typec)
 
     def check(self, func_names, curvars):
-        if self.type != self.expr.get_type(curvars):
-            raise MismatchedTypeError(self.typec, self.type, self.expr.get_type(curvars))
+        type1 = self.type
+        type2 = self.expr.get_type(curvars)
+
+        int_type = ElementaryType(BaseType.Integer)
+        char_type = ElementaryType(BaseType.Char)
+        bool_type = ElementaryType(BaseType.Boolean)
+
+        if type1 == int_type:
+            if type2 != char_type and type2 != int_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type1 == char_type:
+            if type2 != char_type and type2 != int_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type1 == bool_type:
+            if type2 != bool_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type(type1) == ArrayType:
+            if type2 != type1 and type2 != ElementaryType(BaseType.Void):
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
         curvars[self.name] = {'type': self.type, 'name': self.name}
 
 
@@ -219,12 +240,34 @@ class AssignOperator(Operator):
         if type(self.lexpr) is VarName and self.lexpr.name not in curvars:
             raise UndeclaredVarError(self.lexprc, self.lexpr.name)
         type1 = None
-        if self.lexpr.name in curvars:
-            type1 = curvars[self.lexpr.name]['type']
+        if type(self.lexpr) == BinOpExpression:
+            if self.lexpr.left.name in curvars:
+                type1 = curvars[self.lexpr.left.name]['type'].wrapped
+        else:
+            if self.lexpr.name in curvars:
+                type1 = curvars[self.lexpr.name]['type']
         type2 = self.rexpr.get_type(curvars)
 
-        if type1 != type2:
-            raise MismatchedTypeError(self.lexprc, type1, type2)
+        int_type = ElementaryType(BaseType.Integer)
+        char_type = ElementaryType(BaseType.Char)
+        bool_type = ElementaryType(BaseType.Boolean)
+
+        if type1 == int_type:
+            if type2 != char_type and type2 != int_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type1 == char_type:
+            if type2 != char_type and type2 != int_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type1 == bool_type:
+            if type2 != bool_type:
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
+        if type(type1) == ArrayType:
+            if type2 != type1 and type2 != ElementaryType(BaseType.Void):
+                raise MismatchedTypeError(self.lexprc, type1, type2)
+
 
 
 @dataclass
@@ -257,8 +300,6 @@ class FuncCallOperator(Operator):
                 raise MismatchedTypeError(self.params_coords[i], param.get_type(curvars), exp_param.type)
 
 
-
-
 @dataclass
 class CompBranch:
     condition: Expression
@@ -278,6 +319,9 @@ class ConditionOperator(Operator):
     comp_branches: list[CompBranch]
 
     def check(self, funcs, curvars):
+        if self.condition.get_type(curvars) != ElementaryType(BaseType.Boolean):
+            raise MismatchedTypeError("", self.condition.get_type(curvars), ElementaryType(BaseType.Boolean))
+
         curvars_internal = curvars.copy()
         for operator in self.then_branch:
             operator.check(funcs, curvars_internal)
@@ -301,6 +345,8 @@ class WhileLoopOperator(PreConditionLoopOperator):
     operators: list[Operator]
 
     def check(self, funcs, curvars):
+        if self.condition.get_type(curvars) != ElementaryType(BaseType.Boolean):
+            raise MismatchedTypeError("", self.condition.get_type(curvars), ElementaryType(BaseType.Boolean))
         curvars_internal = curvars.copy()
         for operator in self.operators:
             operator.check(funcs, curvars_internal)
@@ -316,6 +362,15 @@ class ForLoopOperator(PreConditionLoopOperator):
     operators: list[Operator]
 
     def check(self, funcs, curvars):
+        if self.from_expr.get_type(curvars) != ElementaryType(BaseType.Integer):
+            raise MismatchedTypeError("", self.from_expr.get_type(curvars), ElementaryType(BaseType.Integer))
+
+        if self.to_expr.get_type(curvars) != ElementaryType(BaseType.Integer):
+            raise MismatchedTypeError("", self.to_expr.get_type(curvars), ElementaryType(BaseType.Integer))
+
+        if self.step.get_type(curvars) != ElementaryType(BaseType.Integer):
+            raise MismatchedTypeError("", self.step.get_type(curvars), ElementaryType(BaseType.Integer))
+
         curvars_internal = curvars.copy()
         for operator in self.operators:
             operator.check(funcs, curvars_internal)
@@ -327,6 +382,9 @@ class PostConditionLoopOperator(Operator):
     operators: list[Operator]
 
     def check(self, funcs, curvars):
+        if self.condition.get_type(curvars) != ElementaryType(BaseType.Boolean):
+            raise MismatchedTypeError("", self.condition.get_type(curvars), ElementaryType(BaseType.Boolean))
+
         curvars_internal = curvars.copy()
         for operator in self.operators:
             operator.check(funcs, curvars_internal)
@@ -340,6 +398,10 @@ class ReturnOperator(Operator):
 @dataclass
 class AssertOperator(Operator):
     expr: Expression
+
+    def check(self, funcs, curvars):
+        if self.expr.get_type(curvars) != ElementaryType(BaseType.Boolean):
+            raise MismatchedTypeError("", self.expr.get_type(curvars), ElementaryType(BaseType.Boolean))
 
 
 @dataclass
@@ -368,6 +430,10 @@ class BinOpExpression(Expression):
 
     @pe.ExAction
     def create(attrs, coords, res_coord):
+        if len(attrs) == 2:
+            varn, ind = attrs
+            vc, ic, _, _ = coords
+            return BinOpExpression(varn, "[]", ind, vc)
         left, op, right = attrs
         lc, opc, rc = coords
         return BinOpExpression(left, op, right, lc)
@@ -378,7 +444,6 @@ class BinOpExpression(Expression):
         bool_type = ElementaryType(BaseType.Boolean)
         ltype = self.left.get_type(curvars)
         rtype = self.right.get_type(curvars)
-        print(ltype)
 
         if self.op == '+':
             if ltype == int_type and rtype == int_type:
@@ -392,7 +457,7 @@ class BinOpExpression(Expression):
         if self.op == '-':
             if ltype == int_type and rtype == int_type:
                 return int_type
-            if ltype == char_type and rtype == int_type:
+            if ltype == char_type and rtype == char_type:
                 return int_type
             if ltype == char_type and rtype == int_type:
                 return char_type
@@ -433,6 +498,11 @@ class BinOpExpression(Expression):
             if ltype == bool_type and rtype == bool_type:
                 return bool_type
             raise WrongBinOperandTypes(self.binc, self.op, ltype, rtype)
+
+        if self.op in ["[]"]:
+            if rtype != int_type and rtype != char_type:
+                raise WrongBinOperandTypes(self.binc, self.op, ltype, rtype)
+            return ltype.wrapped
 
         if ltype != rtype:
             raise MismatchedTypeError(self.binc, ltype, rtype)
@@ -481,6 +551,10 @@ class UnOpExpression(Expression):
         int_type = ElementaryType(BaseType.Integer)
         char_type = ElementaryType(BaseType.Char)
         bool_type = ElementaryType(BaseType.Boolean)
+
+        if type(self.expr) == ArrayType:
+            return self.expr
+
         ltype = self.expr.get_type(curvars)
 
         if self.op == "[]":
@@ -583,8 +657,9 @@ NCondOperator, NCompBranches, NPreConditionLoop, NLoopStep, NPostConditionLoop, 
     map(pe.NonTerminal, 'CondOperator CompBranches PreConditionLoop LoopStep PostConditionLoop ReturnOperator'.split())
 NAssertOperator, NExpr, NLogCompOp, NLogCompExpr, NLogOp, NLogExpr, NCmpOp, NCmpExpr, NArithmOp = \
     map(pe.NonTerminal, 'AssertOperator Expr LogCompOn LogCompExpr LogOp LogExpr CmpOp CmpExpr ArithmOp'.split())
-NArithmExpr, NMulOp, NMulExpr, NDegOp, NDegExpr, NUnaryOp, NUnaryExpr, NNewExpr, NArrVal, NConst = \
-    map(pe.NonTerminal, 'ArithmExpr MulOp MulExpr DegOp DegExpr UnaryOp UnaryExpr NewExpr ArrVal Const'.split())
+NArithmExpr, NMulOp, NMulExpr, NDegOp, NDegExpr, NUnaryOp, NUnaryExpr, NNewExpr, NArrVal, NConst, NVarArgName = \
+    map(pe.NonTerminal,
+        'ArithmExpr MulOp MulExpr DegOp DegExpr UnaryOp UnaryExpr NewExpr ArrVal Const VarArgName'.split())
 
 NProgram |= NFuncs, lambda funcs: Program(funcs)
 NFuncs |= NFuncs, NFunc, lambda funcs, func: funcs + [func]
@@ -689,14 +764,15 @@ NUnaryExpr |= NFuncCallOperator
 NUnaryExpr |= NNewExpr
 NUnaryExpr |= NConst
 
-
 NUnaryExpr |= INTEGER, lambda x: ConstExpr(x, ElementaryType(BaseType.Integer))
 NUnaryExpr |= CHAR, lambda x: ConstExpr(x, ElementaryType(BaseType.Char))
 NUnaryExpr |= BOOLEAN, lambda x: ConstExpr(x, ElementaryType(BaseType.Boolean))
 NUnaryExpr |= STRING, lambda x: ConstExpr(x, ArrayType(ElementaryType(BaseType.Char)))
 
-NNewExpr |= KV_NEW, NType, '[', NExpr, ']'
-NArrVal |= ANYNAME, '[', NExpr, ']'
+NNewExpr |= KV_NEW, NType, '[', NExpr, ']', lambda type, expr: UnOpExpression("new", ArrayType(type))
+NArrVal |= NArrVal, '[', NExpr, ']', BinOpExpression.create
+NArrVal |= NVarArgName, '[', NExpr, ']', BinOpExpression.create
+NVarArgName |= ANYNAME, VarName.create
 
 NType |= KV_INT, lambda: ElementaryType(BaseType.Integer)
 NType |= KV_BOOL, lambda: ElementaryType(BaseType.Boolean)
